@@ -1,0 +1,17 @@
+---
+title: "Untitled"
+author: "hannah"
+date: "1/22/2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## About the data
+
+one row per priate school in CA. One file per school year. downloaded from here: https://www.cde.ca.gov/ds/si/ps/ 
+
+we're interested in how many students are in each grade
+
