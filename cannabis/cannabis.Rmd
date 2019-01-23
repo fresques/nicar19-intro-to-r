@@ -1,0 +1,114 @@
+---
+title: "Untitled"
+author: "hannah"
+date: "1/23/2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(dplyr)
+library(here)
+library(readr)
+```
+
+## about the data
+
+this data is from https://aca6.accela.com/CALCANNABIS/Cap/CapHome.aspx?module=Licenses
+on cannabis cultivation licences 
+see also https://cannabis.ca.gov/check_a_license/
+
+```{r}
+
+cult <- here("cannabis/data/ReocrdList20190123.csv") %>% read_csv()
+
+```
+
+clean up the data a bit.
+
+check that the last column is empty, and if so, dump it.
+
+```{r}
+cult %>% count(X9) # yes, all NAs
+
+cult <- cult %>% select(-X9)
+```
+
+now let's clean up the column names a bit. R will let you have spaces in your column names, but the spaces can be a pain to work with. 
+
+```{r}
+cult %>% colnames()
+cult2 <- cult %>% 
+  # do this one manually
+  rename(City_County=`City - County`) %>% 
+  # for the rest, just replace any spaces in the column name with an underscore
+  rename_all(funs(stringr::str_replace_all(.," ","_")))
+cult2 %>% colnames()
+```
+
+
+Now let's explore the data.
+
+Is the license number a unique record identifier?
+
+```{r}
+# how many rows are there in our data?
+cult2 %>% nrow() # 9472
+# how many unique values are there of License_Number?
+cult2 %>% select(License_Number) %>% n_distinct() # 9463
+```
+
+It looks like there are a few duplicate license numbers. Let's look at them.
+
+```{r}
+cult2 %>% group_by(License_Number) %>% filter(n()>1)
+
+```
+
+they are exact duplicates on all columns. We can confirm that by seeing how many unique rows there are.
+
+```{r}
+cult2 %>% n_distinct() # 9463, same as the number of unique license numbers.
+```
+
+Remove the duplicates.
+
+```{r}
+cult3 <- cult2 %>% distinct()
+cult3 %>% nrow() # 9463, as expected. good.
+```
+
+Let's split out city and county
+
+```{r}
+library(stringr)
+cult3 <- cult3 %>% 
+  mutate(
+    county = ifelse(str_detect(City_County," - "), word(City_County, start=2, sep=" - "), City_County),
+    city   = ifelse(str_detect(City_County," - "), word(City_County, start=1, sep=" - "), NA)
+  )
+```
+
+
+What types of licenses are there?
+
+```{r}
+cult3 %>% count(License_Type, sort=TRUE)
+cult3 %>% count(Type_of_License, sort=TRUE)
+
+```
+
+What counties have the most licences?
+
+```{r}
+cult3 %>% count(county, sort=TRUE)
+
+```
+
+Who are the big players?
+
+```{r}
+cult3 %>% count(Legal_Business_Name, sort=TRUE)
+```
+
+
