@@ -1,0 +1,213 @@
+---
+title: "police_stops"
+author: "MaryJoWebster"
+date: "January 23, 2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+# Load packages
+
+```{r}
+#install.package("reader")
+
+library(readr) #importing csv files 
+library(dplyr) #general analysis 
+library(ggplot2) #for making charts 
+library(ggthemes) #this will help make our charts look better
+library(janitor) #for data cleanup
+library(lubridate) #for working with dates
+library(scales)
+
+#we'll need these new packages for creating this markdown page to an HTMl page
+library(rmarkdown)
+library(knitr)
+
+
+```
+
+# Import data
+
+```{r}
+#Import police stops data
+#source: Minneapolis Police Department
+#downloaded from: http://opendata.minneapolismn.gov/datasets/police-stop-data
+#as of 1/23/2019
+
+stops <-  read_csv('./data/Police_Stop_Data.csv') %>% clean_names()
+
+#American Community Survey, 1 year data, 2017, city of Minnepolis
+#population by race and ethnicity
+#Table B03002
+pop <-  read_csv('./data/acs2017_mpls_race.csv') %>% clean_names()
+
+```
+
+```{r}
+head(stops)
+```
+
+# Explore the data
+
+```{r}
+#Number of stops per year
+#use the year function from the lubridate package
+
+stops %>% group_by(year(response_date)) %>% summarise(count=n())
+```
+
+
+```{r}
+#Why are there so few stops in 2016?
+#Started tracking stops at end of October 2016
+#First valid month of data is November 2016
+
+stops %>%
+  group_by(response_date) %>% 
+  summarise(count=n()) %>% 
+  arrange(response_date)
+```
+
+
+
+```{r}
+# What's the breakdown of stops by race of the driver?
+
+
+stops %>% group_by(race) %>% summarise(count=n()) %>% arrange(desc(count))
+```
+
+```{r}
+#use mutate to add the percentage of stops and to format the percentage
+
+stops %>% group_by(race) %>% 
+  summarise(count=n()) %>%
+  mutate(percent=(count/sum(count)*100)) %>% 
+  mutate(percent=round(percent, digits=1)) %>% 
+  arrange(desc(percent))
+
+
+
+
+```
+
+# Explore more on your own
+
+```{r}
+#Were men stopped more frequently than women?
+
+
+
+
+```
+
+
+
+
+```{r}
+# What were the most common problems that led police to make these stops?
+
+
+```
+
+
+
+```{r}
+#How often were vehicles searched?
+
+
+```
+
+
+
+
+# Is there a racial disparity?
+
+
+
+```{r}
+#Look at the census data
+#Note that this is heirarchical
+#original table: https://censusreporter.org/data/table/?table=B03002&geo_ids=16000US2743000&primary_geo_id=16000US2743000
+
+
+pop %>% group_by(group) %>% summarise(tot=sum(total)) %>% arrange(desc(tot))
+```
+
+
+
+
+```{r}
+
+#We need to make a population table that better aligns with the police stop race groups
+#create a new column and recategorize
+pop <-  pop %>% mutate(race_new=case_when(group=='nothispanic_white'~'White',
+                                  group=='nothispanic_black'~'Black',
+                                  group=='nothispanic_amindian'~'Native American',
+                                  group=='nothispanic_asian'~'Asian',
+                                  group=='nothispanic_other'~'Other',
+                                  group=='nothispanic_pacislander'~'Other',
+                                  group=='nothispanic_multiple'~'Other',
+                                  group=='latino_total'~'Latino'))
+```
+
+
+```{r}
+#Look at our results
+pop %>% filter(race_new!="NA") %>%
+  group_by(race_new) %>%
+  summarize(tot=sum(total))
+```
+```{r}
+#Make a new dataframe, and add a percentage
+
+pop_new <-   pop %>% filter(race_new!="NA") %>%
+  group_by(race_new) %>%
+  summarize(tot=sum(total)) %>% 
+   mutate(percent=(tot/sum(tot)*100)) %>% 
+  mutate(percent=round(percent, digits=1)) %>% 
+  arrange(desc(percent))
+
+```
+
+```{r}
+#Make a new column to recategorize the race fields in the police stop data to 
+#better match the census data
+#Populate the NA as "Unknown" 
+#Re-categorize East African as "Black"
+
+stops <-  stops %>% mutate(race_new = case_when(race=='East African'~'Black',
+                                                is.na(race)~'Unknown',
+                                                TRUE~race))
+
+#review the changes
+stops %>% group_by(race, race_new) %>% summarise(count=n())
+```
+
+
+
+```{r}
+#Make a new dataframe with the totals by race from the police stops data
+
+stops_by_race <-  stops %>% group_by(race_new) %>% summarise(tot_stopped=n()) %>% 
+     mutate(percent_stopped=(tot_stopped/sum(tot_stopped)*100)) %>% 
+  mutate(percent_stopped=round(percent_stopped, digits=1)) %>% 
+  arrange(desc(percent_stopped))
+```
+
+```{r}
+#Join the two new dataframes together
+#use left join to make sure you keep all the stop data (note the Unknown column)
+
+race_chart_data <-  left_join(stops_by_race, pop_new, by=c("race_new"="race_new"))
+
+
+
+#view new dataframe
+race_chart_data
+```
+
