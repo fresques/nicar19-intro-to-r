@@ -7,6 +7,10 @@ output: html_document
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
+
+library(dplyr)
+library(here)
+library(readxl)
 ```
 
 ## About the data
@@ -14,4 +18,215 @@ knitr::opts_chunk$set(echo = TRUE)
 one row per priate school in CA. One file per school year. downloaded from here: https://www.cde.ca.gov/ds/si/ps/ 
 
 we're interested in how many students are in each grade
+
+```{r}
+priv <- here("privateSchools/data/privateschools1617.xls") %>% read_xls(skip = 3)
+```
+
+That's so much information! Let's just keep the columns we care about.
+```{r}
+colnames(priv)
+
+priv2 <- priv %>% 
+  # R will let you have spaces in your column names, but the spaces can be a pain to work with. 
+  # replace any spaces in the column name with an underscore
+  rename_all(funs(stringr::str_replace_all(.," ","_"))) %>% 
+  # choose just the columns we want to keep
+  select(Affidavit_ID,
+    County,
+    CDS_Code,
+    School,
+    Public_District,
+    # the colon lets us choose all columns between Low Grade and Total Enrollment without having to list them all.
+    Kindergarten_Enrollment:Total_Enrollment,
+    Religious_Classification,
+    Religious_Denomination
+  ) 
+
+```
+
+
+```{r}
+priv2 %>% nrow() # 3076
+priv2 %>% select(Affidavit_ID) %>% n_distinct() # 3076
+priv2 %>% select(CDS_Code) %>% n_distinct() # 3072
+```
+
+
+Let's look at total enrollment
+
+```{r}
+enr <- here("privateSchools/data/enr17.txt") %>% read_tsv(col_types = cols(CDS_CODE = col_character()))
+
+enr %>% count(GENDER)
+enr %>% count(ETHNIC)
+
+options(scipen=999)
+
+```
+
+
+What overlap is there on schools in priv and enr?
+
+```{r}
+overlap <- inner_join(priv2,enr,by=c("CDS_Code"="CDS_CODE"))
+```
+
+Looks like none. Good.
+
+Let's combine the data.
+
+
+```{r}
+# make column names consistent
+priv3 <- priv2 %>%
+  rename(
+    DISTRICT=Public_District,
+    KDGN=Kindergarten_Enrollment,
+    GR_1=Grade_1_Enrollment,
+    GR_2=Grade_2_Enrollment,
+    GR_3=Grade_3_Enrollment,
+    GR_4=Grade_4_Enrollment,
+    GR_5=Grade_5_Enrollment,
+    GR_6=Grade_6_Enrollment,
+    GR_7=Grade_7_Enrollment,
+    GR_8=Grade_8_Enrollment,
+    UNGR_ELM=Ungraded_Elementary_Enrollmnet,
+    GR_9=Grade_9_Enrollment,
+    GR_10=Grade_10_Enrollment,
+    GR_11=Grade_11_Enrollment,
+    GR_12=Grade_12_Enrollment,
+    UNGR_SEC=Ungraded_Secondary_Enrollment,
+    ENR_TOTAL=Total_Enrollment
+  ) %>% 
+  rename_all(funs(toupper(.))) 
+
+
+# combine public and private schools
+enr2 <- bind_rows(
+  enr   %>% mutate(type="public"),
+  priv3 %>% mutate(type="private")
+  )
+
+enr2 %>% count(type)
+
+```
+
+
+
+
+Let's make our data 'longer'
+
+```{r}
+library(tidyr)
+library(stringr)
+enr_long <- enr2 %>% 
+  gather(
+    key="grade",
+    value="enrollment", 
+    -CDS_CODE,-COUNTY,-DISTRICT,-SCHOOL,-ETHNIC,-GENDER,-type,-AFFIDAVIT_ID,-RELIGIOUS_CLASSIFICATION,-RELIGIOUS_DENOMINATION
+    ) 
+
+enr_long %>% count(grade)
+
+enr_long <- enr_long %>% 
+  mutate(
+    grade_clean = case_when(
+      # manually recode grade descriptions here
+      grade=="ENR_TOTAL"~"TOTAL",
+      # then clean up the rest with this formula to remove GR_ 
+      TRUE~str_replace(grade,"^GR_","")
+    )
+  )
+
+enr_long %>% count(grade_clean,grade)
+
+
+library(forcats)
+orderedGrades <- c("KDGN","1","2","3","4","5","6","7","8","UNGR_ELM","9","10","11","12","UNGR_SEC","ADULT","TOTAL")
+enr_long <- enr_long %>% 
+  mutate(
+    grade_clean = as_factor(grade_clean,levels=orderedGrades)
+  )
+
+enr_long %>% count(grade_clean,grade)
+
+```
+
+
+# sum up across race and gender
+
+
+```{r}
+enr_medium <- enr_long %>% 
+  group_by(CDS_CODE,COUNTY,DISTRICT,SCHOOL,type,AFFIDAVIT_ID,RELIGIOUS_CLASSIFICATION,RELIGIOUS_DENOMINATION,grade_clean) %>% 
+  summarize(
+    enrollment=sum(enrollment,na.rm = TRUE)
+  )
+```
+
+
+
+# sum up by district
+
+```{r}
+enr_dist <- enr_medium %>% 
+  group_by(COUNTY,DISTRICT,type,grade_clean) %>%
+  summarize(
+    enrollment=sum(enrollment,na.rm=TRUE)
+  ) 
+```
+
+
+# let's look at orange county!
+
+```{r}
+orange <- enr_dist %>% filter(COUNTY=="Orange")
+
+orange %>% ungroup() %>% count(DISTRICT)
+
+orange2 <- orange %>% filter(DISTRICT != "SBE - Magnolia Science Academy Santa Ana" & !is.na(DISTRICT))
+```
+
+
+```{r}
+library(ggplot2)
+orange2 %>% 
+  filter(grade_clean!="TOTAL") %>% 
+  ggplot(aes(x=grade_clean,y=enrollment,fill=type)) +
+    geom_col(position="dodge") +
+    theme_minimal() +
+    facet_wrap(~DISTRICT)
+```
+
+
+
+
+
+# pull out district ID
+
+per https://www.cde.ca.gov/ds/si/ds/:
+The 14-digit CDS code is the official, unique identification of a school within California. The first two digits identify the county, the next five digits identify the school district, and the last seven digits identify the school. 
+
+```{r}
+
+enr <- enr %>% 
+  mutate(
+    dist_id = str_sub(CDS_CODE,1,7)
+  )
+
+enr %>% select(dist_id) %>% n_distinct()
+enr %>% select(COUNTY,DISTRICT) %>% n_distinct()
+
+enr_dist <- enr %>% 
+  group_by()
+```
+
+
+
+
+
+
+
+
 
