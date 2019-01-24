@@ -1,0 +1,359 @@
+---
+title: "opiate_deaths"
+author: "MaryJoWebster"
+date: "January 22, 2019"
+output: html_document
+
+
+#this is the YAML header and what it looks like by default
+
+
+#let's improve it for our web page
+#title: "Making charts with ggplot2"
+#author: "By MaryJo Webster"
+#date:  "Last updated: `r Sys.Date()`"
+#output:
+#  html_document: 
+#    toc: true
+#    to_depth: 1
+#    toc_float: true
+#    theme: cerulean
+
+
+---
+
+
+# Set up
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+#Echo=TRUE means your code will be displayed on the HTML page
+#change that to echo=FALSE to hide the code and only display results
+
+#This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+
+```
+## How to run code
+To run a single line of code, there are a many options. The first is to have your cursor on the code and hit Control-Enter at the same time. The second is to highlight that line of code (or a bunch of lines) and go to the Run button (up top, near the Insert button) and choose "Run selected lines". Another is to run an entire "chunk" at the same time (everything between the ```{r} and the ```) by clicking Control-Shift-Enter while your cursor is anywhere inside the chunk.
+
+
+
+## Load packages
+
+```{r}
+#install.package("reader")
+
+library(readr) #importing csv files 
+library(dplyr) #general analysis 
+library(ggplot2) #for making charts 
+library(ggthemes) #this will help make our charts look better
+library(janitor) #for data cleanup
+library(lubridate) #for working with dates
+
+#we'll need these new packages for creating this markdown page to an HTMl page
+library(rmarkdown)
+library(knitr)
+```
+
+
+## Import data
+```{r}
+#Death records for opioid-related deaths
+
+#first we'll set the name of our new data frame
+#then we'll use the read_csv, which is part of the readr package
+#and we'll tell it where to find csv file
+
+deaths <- read_csv('./data/opiate_deaths.csv')
+```
+
+
+## Review data
+<p>There are a bunch of ways to make sure your data came in the way you wanted. The one that is probably most similar to what you're used to is to go to the Environment tab (in upper right corner) and double-click on the opiatedata data frame. It will pop it open in a new window -- showing you some (but not all) of the rows, plus all the columns. This is a way to eyeball what it looks like.</p>
+<p>You can also run some R commands, such as these below:</p>
+
+```{r}
+
+#this shows us the top few rows of the file
+head(deaths)
+
+#you can also just type the name of your data frame and it will make it appear below
+deaths
+
+
+#this shows us the column names
+names(deaths)
+
+
+#this shows us the structure (column formats, etc)
+str(deaths)
+
+
+#look to see the columns are formatted the way you want 
+#(dates are date formats, numbers are numeric, etc)
+
+#notice that all the date fields came in as characters (not what we want!)
+#birthdate
+#deathdate
+#injury_date
+
+
+
+```
+
+
+```{r}
+#Let's go back and add some details to the import code
+#the col_types function allows you to set formats for specific fields
+#in this case, I also told it the default should be character
+#for any fields that I don't specify
+#here, we need to tell R how the dates in our underlying data are structured
+#more info about date formats using readr here: https://readr.tidyverse.org/reference/parse_datetime.html
+
+
+#copy this code and replace the original import code at the top of the page
+deaths <- read_csv('./data/opiate_deaths.csv',
+                   col_types=cols(.default="c", BIRTHDATE=col_date("%m/%d/%Y"),
+                                  DEATHDATE=col_date("%m/%d/%Y"),
+                                  INJURY_DATE=col_date("%m/%d/%Y")))
+
+```
+
+# Analysis
+One of the packages within Tidyverse is called "dplyr" and it works very much like Structured Query Language (SQL) and allows you to filter, sort and summarize your data (like in a Pivot Table).
+
+
+## Select
+```{r}
+#We can use the SELECT command to return only certain columns (but all the rows)
+deaths %>%  select(LASTNAME, FIRSTNAME, DEATHDATE, AGEYEARS)
+```
+
+## Try using SELECT on your own
+
+```{r}
+#Create your own query showing LASTNAME, RACE, GENDER
+
+
+```
+
+## Filtering
+```{r}
+# a single filter
+# note that it needs two equal signs in a row
+
+deaths %>%   filter(GENDER=="F") %>% select(LASTNAME, DEATHDATE, GENDER, RACE)
+
+
+#put quotes around character values
+# no quotes for numeric. ( i.e. AGEYEARS== 20  )
+
+
+```
+
+```{r}
+#Find people who died on New Year's Eve, 2015
+#Note how dates are stored in R
+
+deaths %>%  filter(DEATHDATE=='2015-12-31')
+```
+
+
+
+## Your turn - practice filtering
+
+```{r}
+# Find people who died in (DEATHCOUNTY) "HENNEPIN" county.
+
+```
+
+
+
+## Filtering with "and"
+
+```{r}
+# find black women who died
+
+deaths %>%   filter(GENDER=="F", RACE=="BLACK") %>% select(LASTNAME, DEATHDATE, GENDER, RACE)
+```
+
+## Your turn - filtering with "and"
+```{r}
+# find deaths involving men (GENDER) who were 18 years old (AGEYEARS)
+
+
+
+```
+
+
+## Indenting code
+When you start to get a lot of code, you might want to use indentation to make it cleaner to read. In the examples below, notice that the pipe (%>%) is always at the end of a line, not the beginning, and each piece of code is on its own line.
+
+
+
+## Filtering with "or"
+
+```{r}
+# find people who were either Black or American Indian
+
+#option 1 using the pipe character
+deaths%>%
+  filter(RACE=="BLACK" | RACE=="AMERICAN INDIAN") %>%
+  select(LASTNAME, DEATHDATE, GENDER, RACE)
+
+#option 2 using %in%  (this one would be more useful if you have a long series you want to include)
+deaths%>%
+  filter(RACE %in% c("BLACK", "AMERICAN INDIAN", "CHINESE")) %>%
+  select(LASTNAME, DEATHDATE, GENDER, RACE)
+```
+
+
+
+
+
+
+
+# Summarizing data
+a.k.a. Pivot Tables or group by queries
+
+```{r}
+# Number of deaths by gender
+
+deaths%>%
+  group_by(GENDER)%>%
+  summarize(numdeaths=n())
+```
+
+## Arrange (order by/sort)
+```{r}
+
+#descending by number of deaths
+deaths %>% 
+  group_by(GENDER) %>% 
+  summarise(numdeaths=n()) %>% 
+  arrange(desc(numdeaths))
+
+#ascending by gender
+deaths %>% 
+  group_by(GENDER) %>% 
+  summarise(numdeaths=n()) %>% 
+  arrange(GENDER)
+```
+
+
+## Your turn - summarize
+```{r}
+#Number of deaths by race, ordered from highest to lowest
+
+
+```
+
+
+
+```{r}
+# Number of deaths by county (DEATHCOUNTY), highest to lowest
+
+
+```
+
+
+#Filter, summarize, arrange
+
+```{r}
+#let's put a bunch of things together
+#How many women died in each county, sorted highest to lowest?
+
+deaths %>% 
+  filter(GENDER=='F') %>% 
+  group_by(DEATHCOUNTY) %>% 
+  summarize(count=n()) %>% 
+  arrange(desc(count))
+
+
+
+```
+
+##Add a percentage
+
+```{r}
+#What percentage of deaths were women?
+
+deaths %>% 
+  group_by(GENDER) %>% 
+  summarise(numdeaths=n()) %>% 
+  mutate(percent=numdeaths/sum(numdeaths)) 
+
+```
+
+```{r}
+#Let's make that look better
+deaths %>% 
+  group_by(GENDER) %>% 
+  summarise(numdeaths=n()) %>% 
+   mutate(percent=(numdeaths/sum(numdeaths)*100)) %>% 
+  mutate(percent=round(percent, digits=1)) %>% 
+  arrange(desc(percent))
+
+```
+
+
+
+
+# Intro to date functions
+
+```{r}
+# Our data doesn't include a field indicating the year that each person died. It only has the full death date. In order to group by and summarize by the year, we need to extract the year from the deathdate. We can do this on the fly in a query. Or add it as a new field to the table
+
+#we'll use the year() function from the lubridate package
+#make sure we loaded that library at the top of the page
+#library(lubridate)
+
+#on the fly query
+
+deaths %>% group_by(year(DEATHDATE)) %>% summarize(count=n())
+```
+
+# Add a new column
+```{r}
+#We can use mutate() function from tidyverse to add a new column to our data frame
+
+#note that we overwrite our existing data frame
+
+deaths <- deaths %>% 
+  mutate(DEATHYR = year(DEATHDATE))
+
+
+```
+
+```{r}
+#Use our new field for a query
+
+deaths %>% group_by(DEATHYR) %>% summarize(count=n())
+```
+
+
+
+
+# More advanced filtering
+##Filtering with a wildcard
+<p>Too often, our data is inconsistent and telling it to find one thing will be insufficient. In filters in Excel, we have the option to choose "begins with" or "contains" to find values that might not perfectly match. In this dataset, there are several variations for people described as being white. To get them, we'll need this kind of wildcard.</p>
+<p>To do this, we're going to use dplyr's filter function, along with Base R's grepl, which is a way to do string and pattern matching.</p>
+<p>So that you can see that you really did get back lots of variations of "white", I changed up the code so that it summarizes the results (a Pivot Table, in other words). We'll be explaining that next.</p>
+
+```{r query5}
+#the syntax for grepl is to put the word you're looking for in quotes, followed by the name of the column where you want it to look
+  deaths %>%
+  filter(grepl("WHITE", RACE)) %>%
+  group_by(RACE) %>%
+  summarize(count=n()) 
+```
+
+##Filtering between two values
+<p>Perhaps we want to find all the people who were between ages 18 and 21. Note that I'm using greater than-equal to and less than-equal to, so that it includes 18 and 21 in my results.</p>
+
+```{r query6}
+deaths %>%
+  filter(AGEYEARS>=18, AGEYEARS<=21) %>%
+  group_by(AGEYEARS) %>%
+  summarise(count=n()) 
+```
