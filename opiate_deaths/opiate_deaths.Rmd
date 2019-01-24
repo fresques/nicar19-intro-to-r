@@ -115,6 +115,7 @@ str(deaths)
 deaths <- read_csv('./data/opiate_deaths.csv',
                    col_types=cols(.default="c", BIRTHDATE=col_date("%m/%d/%Y"),
                                   DEATHDATE=col_date("%m/%d/%Y"),
+                                  AGEYEARS=col_integer(),
                                   INJURY_DATE=col_date("%m/%d/%Y")))
 
 ```
@@ -140,7 +141,7 @@ deaths %>%  select(LASTNAME, FIRSTNAME, DEATHDATE, AGEYEARS)
 ## Filtering
 ```{r}
 # a single filter
-# note that it needs two equal signs in a row
+# note that it needs two equal signs
 
 deaths %>%   filter(GENDER=="F") %>% select(LASTNAME, DEATHDATE, GENDER, RACE)
 
@@ -168,7 +169,12 @@ deaths %>%  filter(DEATHDATE=='2015-12-31')
 ```
 
 
+## Indenting code
+When you start to get a lot of code, you might want to use indentation to make it cleaner to read. In the examples below, notice that the pipe (%>%) is always at the end of a line, not the beginning, and each piece of code is on its own line.
 
+
+
+# More filtering
 ## Filtering with "and"
 
 ```{r}
@@ -176,19 +182,6 @@ deaths %>%  filter(DEATHDATE=='2015-12-31')
 
 deaths %>%   filter(GENDER=="F", RACE=="BLACK") %>% select(LASTNAME, DEATHDATE, GENDER, RACE)
 ```
-
-## Your turn - filtering with "and"
-```{r}
-# find deaths involving men (GENDER) who were 18 years old (AGEYEARS)
-
-
-
-```
-
-
-## Indenting code
-When you start to get a lot of code, you might want to use indentation to make it cleaner to read. In the examples below, notice that the pipe (%>%) is always at the end of a line, not the beginning, and each piece of code is on its own line.
-
 
 
 ## Filtering with "or"
@@ -206,8 +199,6 @@ deaths%>%
   filter(RACE %in% c("BLACK", "AMERICAN INDIAN", "CHINESE")) %>%
   select(LASTNAME, DEATHDATE, GENDER, RACE)
 ```
-
-
 
 
 
@@ -273,6 +264,7 @@ deaths %>%
 
 ```
 
+
 ##Add a percentage
 
 ```{r}
@@ -325,11 +317,171 @@ deaths <- deaths %>%
 
 ```
 
-```{r}
-#Use our new field for a query
 
-deaths %>% group_by(DEATHYR) %>% summarize(count=n())
+# Make a new data frame
+
+
+```{r}
+# Let's make that last query (using our new year field) into its own data frame
+#so we can then use it as the basis for a chart
+
+deaths_by_year <-  deaths %>%
+  group_by(DEATHYR) %>% 
+  summarize(numdeaths=n())
+
+
+
 ```
+
+
+# Making charts
+
+##The basics for a bar chart
+```{r chart1}
+
+deaths_by_year_chart <-   #create a new data frame
+  ggplot(deaths_by_year, aes(x = DEATHYR, y = numdeaths)) +   #this line tells it what data to chart
+  geom_bar(stat = "identity")  #this line tells it to make a bar chart
+
+
+plot(deaths_by_year_chart)  #this generates the plot
+```
+
+
+
+##Add some styling
+Let's start by setting the factor order of the deathyr field so that it plots in the correct order and displays the labels correctly.
+
+
+
+```{r}
+deaths_by_year$DEATHYR <-  factor(deaths_by_year$DEATHYR, levels=deaths_by_year$DEATHYR[order(deaths_by_year$DEATHYR)])
+```
+
+
+Then we'll add a title and some labels. There are a variety of ways to do this. Here's my favorite:
+
+
+```{r chart2}
+
+#Build the chart again, this time with labels and titles
+deaths_by_year_chart <- 
+  ggplot(deaths_by_year, aes(x = DEATHYR, y = numdeaths)) + 
+  geom_bar(stat = "identity") +
+    labs(title = "Number of opiate deaths by year in Minnesota", 
+       subtitle = "2006-2015",
+       caption = "Graphic by MaryJo Webster",
+       x="Year",
+       y="Number of deaths")
+
+plot(deaths_by_year_chart)
+```
+
+Add color:
+
+Notice in the geom_bar line (in chart below) I've added "color="black" (this is for the outline of the bars) and fill="#006699" (this is for the fill color). This is a hex color code. You can go to colorbrewer.org to find all kinds of great color options that are color-blind safe. You could also put that same hex code in the color spot so that it's all one color and essentially doesn't have a border. More hex color codes are here http://www.color-hex.com/
+
+```{r chart3}
+
+deaths_by_year_chart_2 <- ggplot(deaths_by_year, aes(x = DEATHYR, y = numdeaths)) + 
+  geom_bar(stat = "identity", color="black", fill="#006699") +
+  labs(title = "Number of opiate deaths by year in Minnesota", 
+       subtitle = "2006-2015",
+       caption = "Graphic by MaryJo Webster",
+       x="Year",
+       y="Number of deaths")
+
+plot(deaths_by_year_chart_2)
+
+```
+
+
+
+Add value labels & a theme
+
+I'd like to display the number of deaths at the end of each bar. To do that we'll use geom_text(). This one gets a bit more complicated. 
+
+We're adding a new line called geom_text. We tell it where to get the label (from the numdeaths column) and then you have some options for the size of the text (size) and placement (hjust and position)
+
+I've also added:  theme_hc() +
+
+This tells it to give it a different look using a "theme" based on High Charts. It gets rid of the grey background. There are a variety of great themes you can access using the ggthemes library.
+
+
+```{r chart6}
+
+deaths_by_year_chart_2 <- ggplot(deaths_by_year, aes(x = DEATHYR, y = numdeaths)) +
+    geom_bar(stat = "identity", color="#006699", fill="#006699") +
+    geom_text(stat="identity", label=paste0((deaths_by_year$numdeaths)), vjust=1.5)+
+    theme_hc()+  #this uses the "High Charts" theme
+    labs(title = "Number of opiate deaths by year in Minnesota", 
+       subtitle = "2006-2015",
+       caption = "Graphic by MaryJo Webster",
+       x="Year",
+       y="Number of deaths")
+
+plot(deaths_by_year_chart_2)
+```
+
+
+
+#Export our chart
+```{r}
+#https://ggplot2.tidyverse.org/reference/ggsave.html
+
+ggsave("deaths_by_year_chart.jpg", width=8, height=5, units="in", dpi="print")
+```
+
+
+
+## Make your own bar chart
+
+```{r}
+#Create a new data frame totaling the deaths by gender
+
+
+
+#Create a data frame plotting those totals (hint: x=gender)
+
+
+#plot the data frame
+
+
+```
+
+
+
+# Cleaning data
+
+```{r}
+# let's look at this field to see where we've got a problem
+deaths %>% group_by(HISPANICETHNICITY) %>% summarise(count=n())
+```
+
+#Recode values into a new column
+```{r}
+#we'll use a lot of the same things we did above
+#plus a base R function called "case_when" (it's like an IF statement)
+
+deaths <-  deaths %>%
+  mutate(hispanic_new = 
+           case_when(HISPANICETHNICITY=='Non-Hispanic' | 
+HISPANICETHNICITY=='NOT HISPANIC' ~'NOT HISPANIC',
+TRUE~toupper(HISPANICETHNICITY)))
+
+# the base R function called "toupper()" converts values to uppercase
+
+
+#let's see our new column
+
+deaths %>% 
+  group_by(hispanic_new) %>% 
+  summarise(numdeaths = n())
+
+```
+
+
+
 
 
 
