@@ -1,0 +1,292 @@
+---
+title: "My first RMarkdown page"
+author: "By MaryJo Webster"
+date:  "Last updated: `r Sys.Date()`"
+output:
+  html_document: 
+    toc: true
+    to_depth: 1
+    toc_float: true
+    theme: cerulean
+
+
+---
+
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+
+#Echo=TRUE means your code will be displayed on the HTML page
+#change that to echo=FALSE to hide the code and only display results
+
+#This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+
+```
+
+
+```{r echo=FALSE, warning=FALSE, message=FALSE}
+#install.package("reader")
+
+library(readr) #importing csv files 
+library(dplyr) #general analysis 
+library(ggplot2) #for making charts 
+library(ggthemes) #this will help make our charts look better
+library(janitor) #for data cleanup
+library(lubridate) #for working with dates
+
+#we'll need these new packages for creating this markdown page to an HTMl page
+library(rmarkdown)
+library(knitr)
+library(kableExtra) #this is useful for making your tables look good in html
+```
+
+
+
+```{r}
+#Death records for opioid-related deaths
+
+deaths <- read_csv('./data/opiate_deaths.csv',
+                   col_types=cols(.default="c", BIRTHDATE=col_date("%m/%d/%Y"),
+                                  DEATHDATE=col_date("%m/%d/%Y"),
+                                  AGEYEARS=col_integer(),
+                                  INJURY_DATE=col_date("%m/%d/%Y")))
+```
+
+
+
+# Analysis
+One of the packages within Tidyverse is called "dplyr" and it works very much like Structured Query Language (SQL) and allows you to filter, sort and summarize your data (like in a Pivot Table).
+
+
+
+## Filtering
+```{r echo=FALSE, warning=FALSE, message=FALSE}
+# a single filter
+# note that it needs two equal signs
+
+deaths %>%   filter(GENDER=="F") %>% select(LASTNAME, DEATHDATE, GENDER, RACE) %>% 
+  top_n(10) %>% 
+  kable("html") %>% 
+  kable_styling()
+
+
+#put quotes around character values
+# no quotes for numeric. ( i.e. AGEYEARS== 20  )
+
+
+```
+
+
+##People who died on New Year's Eve 2015
+```{r}
+#Find people who died on New Year's Eve, 2015
+#Note how dates are stored in R
+
+deaths %>%  filter(DEATHDATE=='2015-12-31') %>% 
+  select(FIRSTNAME, LASTNAME, BIRTHDATE, DEATHDATE) %>% 
+  kable("html") %>% 
+  kable_styling()
+```
+
+
+
+
+# Summarizing data
+a.k.a. Pivot Tables or group by queries
+
+```{r}
+# Number of deaths by gender
+
+deaths%>%
+  group_by(GENDER)%>%
+  summarize(numdeaths=n()) %>% 
+    kable("html") %>% 
+  kable_styling()
+  
+```
+
+
+
+
+
+#Filter, summarize, arrange
+
+```{r}
+#let's put a bunch of things together
+#How many women died in each county, sorted highest to lowest?
+
+deaths %>% 
+  filter(GENDER=='F') %>% 
+  group_by(DEATHCOUNTY) %>% 
+  summarize(count=n()) %>% 
+  arrange(desc(count)) %>% 
+  kable("html") %>% 
+  kable_styling()
+
+
+
+```
+
+
+##Add a percentage
+
+
+
+```{r}
+#Let's make that look better
+deaths %>% 
+  group_by(GENDER) %>% 
+  summarise(numdeaths=n()) %>% 
+   mutate(percent=(numdeaths/sum(numdeaths)*100)) %>% 
+  mutate(percent=round(percent, digits=1)) %>% 
+  arrange(desc(percent)) %>% 
+  kable("html") %>% 
+  kable_styling()
+
+```
+
+
+
+
+# Deaths by year
+
+```{r}
+# Our data doesn't include a field indicating the year that each person died. It only has the full death date. In order to group by and summarize by the year, we need to extract the year from the deathdate. We can do this on the fly in a query. Or add it as a new field to the table
+
+#we'll use the year() function from the lubridate package
+#make sure we loaded that library at the top of the page
+#library(lubridate)
+
+#on the fly query
+
+deaths %>% group_by(year(DEATHDATE)) %>% summarize(count=n()) %>% 
+  kable("html") %>% 
+  kable_styling()
+```
+
+
+```{r}
+#We can use mutate() function from tidyverse to add a new column to our data frame
+
+#note that we overwrite our existing data frame
+
+deaths <- deaths %>% 
+  mutate(DEATHYR = year(DEATHDATE))
+
+
+```
+
+
+
+
+```{r}
+# Let's make that last query (using our new year field) into its own data frame
+#so we can then use it as the basis for a chart
+
+deaths_by_year <-  deaths %>%
+  group_by(DEATHYR) %>% 
+  summarize(numdeaths=n())
+
+
+
+```
+
+
+# Making charts
+
+##The basics for a bar chart
+```{r chart1}
+
+deaths_by_year_chart <-   #create a new data frame
+  ggplot(deaths_by_year, aes(x = DEATHYR, y = numdeaths)) +   #this line tells it what data to chart
+  geom_bar(stat = "identity")  #this line tells it to make a bar chart
+
+
+plot(deaths_by_year_chart)  #this generates the plot
+```
+
+
+
+##Add some styling
+Let's start by setting the factor order of the deathyr field so that it plots in the correct order and displays the labels correctly.
+
+
+
+```{r}
+deaths_by_year$DEATHYR <-  factor(deaths_by_year$DEATHYR, levels=deaths_by_year$DEATHYR[order(deaths_by_year$DEATHYR)])
+```
+
+
+Then we'll add a title and some labels. There are a variety of ways to do this. Here's my favorite:
+
+
+```{r chart2}
+
+#Build the chart again, this time with labels and titles
+deaths_by_year_chart <- 
+  ggplot(deaths_by_year, aes(x = DEATHYR, y = numdeaths)) + 
+  geom_bar(stat = "identity") +
+    labs(title = "Number of opiate deaths by year in Minnesota", 
+       subtitle = "2006-2015",
+       caption = "Graphic by MaryJo Webster",
+       x="Year",
+       y="Number of deaths")
+
+plot(deaths_by_year_chart)
+```
+
+Add color:
+
+Notice in the geom_bar line (in chart below) I've added "color="black" (this is for the outline of the bars) and fill="#006699" (this is for the fill color). This is a hex color code. You can go to colorbrewer.org to find all kinds of great color options that are color-blind safe. You could also put that same hex code in the color spot so that it's all one color and essentially doesn't have a border. More hex color codes are here http://www.color-hex.com/
+
+```{r chart3}
+
+deaths_by_year_chart_2 <- ggplot(deaths_by_year, aes(x = DEATHYR, y = numdeaths)) + 
+  geom_bar(stat = "identity", color="black", fill="#006699") +
+  labs(title = "Number of opiate deaths by year in Minnesota", 
+       subtitle = "2006-2015",
+       caption = "Graphic by MaryJo Webster",
+       x="Year",
+       y="Number of deaths")
+
+plot(deaths_by_year_chart_2)
+
+```
+
+
+
+Add value labels & a theme
+
+I'd like to display the number of deaths at the end of each bar. To do that we'll use geom_text(). This one gets a bit more complicated. 
+
+We're adding a new line called geom_text. We tell it where to get the label (from the numdeaths column) and then you have some options for the size of the text (size) and placement (hjust and position)
+
+I've also added:  theme_hc() +
+
+This tells it to give it a different look using a "theme" based on High Charts. It gets rid of the grey background. There are a variety of great themes you can access using the ggthemes library.
+
+
+```{r chart6}
+
+deaths_by_year_chart_2 <- ggplot(deaths_by_year, aes(x = DEATHYR, y = numdeaths)) +
+    geom_bar(stat = "identity", color="#006699", fill="#006699") +
+    geom_text(stat="identity", label=paste0((deaths_by_year$numdeaths)), vjust=1.5)+
+    theme_hc()+  #this uses the "High Charts" theme
+    labs(title = "Number of opiate deaths by year in Minnesota", 
+       subtitle = "2006-2015",
+       caption = "Graphic by MaryJo Webster",
+       x="Year",
+       y="Number of deaths")
+
+plot(deaths_by_year_chart_2)
+```
+
+
+
+
+
+
+
+
+
