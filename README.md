@@ -13,7 +13,7 @@ Workshop prerequisites: This session will be most helpful if you’re comfortabl
 ## Instructors
 MaryJo Webster, Minneapolis Star Tribune (maryjo.webster@startribune.com)
 
-Sandhya Kambhampati, ProPublica
+Sandhya Kambhampati, ProPublica Illinois (sandhya@propublica.org)
 
 Hannah Fresques, ProPublica (hannah.fresques@propublica.org)
 
