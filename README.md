@@ -28,9 +28,3 @@ To use the tools we used in class, you need to install both [R](https://cran.rst
 [RStudio community](https://community.rstudio.com/)
 
 [Weekly R exercises](https://github.com/rfordatascience/tidytuesday/blob/master/README.md)
-
-## Datasets
-
-
-	
-
