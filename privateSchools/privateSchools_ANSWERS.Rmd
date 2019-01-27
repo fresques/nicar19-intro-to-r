@@ -20,6 +20,9 @@ library(ggplot2)
 options(scipen=999)
 ```
 
+THIS IS VERSION HAS WORKED EXAMPLES.
+DURING CLASS, PLEASE USE THE OTHER VERSION.
+
 
 # About the data
 
@@ -51,7 +54,8 @@ Get familiar the priv data frame. Use any functions or techniques you like. (Hin
 What information is there? What structure is the data in?
 
 ```{r}
-
+head(priv)
+colnames(priv)
 ```
 
 
@@ -116,7 +120,12 @@ Explore the pub dataset. You'll want to know the following:
   - what values are there for GENDER and ETHNIC? 
 
 ```{r}
-
+dim(pub)
+colnames(pub)
+pub %>% nrow()
+pub %>% select(CDS_CODE,GENDER,ETHNIC) %>% n_distinct()
+pub %>% count(GENDER)
+pub %>% count(ETHNIC)
 ```
 
 The skim() function is also a nice way to get aquainted with your data.
@@ -147,10 +156,10 @@ You try!
 * 5 minutes *
 ```{r}
 county_pub <- pub %>% 
-  group_by(??) %>% 
+  group_by(COUNTY) %>% 
   summarize(
-    n_schools_pub = ??,
-    enrollment_pub = ??
+    n_schools_pub = n_distinct(CDS_CODE),
+    enrollment_pub = sum(ENR_TOTAL)
   )
 ```
 
@@ -183,9 +192,10 @@ county <- full_join(
 ```
 
 Let's take a look at the dataset.
-I think we should drop the NA county. How do we do that?
+I think we should drop the NA county. 
 ```{r}
-
+county2 <- county %>% 
+  filter(is.na(COUNTY)==F)
 ```
 
 What about those NAs for Alpine and Sierra counties? I think they should be zeros instead.
@@ -202,7 +212,7 @@ What percent of students in each county attend a private school?
 ```{r}
 county2 <- county2 %>% 
   mutate(enrollment_total = enrollment_priv + enrollment_pub) %>% 
-  mutate(pct_priv = ??)
+  mutate(pct_priv = enrollment_priv / enrollment_total)
 ```
 
 
@@ -216,10 +226,19 @@ Make a plot that looks like this:
 
 ```{r}
 plot <- county2 %>% 
-  ggplot(aes()) 
+  ggplot(aes(x=reorder(COUNTY,pct_priv),y=pct_priv)) +
+    geom_col(position="dodge") +
+    theme_minimal() +
+    scale_y_continuous(
+      labels=scales::percent_format(accuracy=1),
+      name="Students in private school"
+      ) +
+    scale_x_discrete(name=NULL) +
+    coord_flip()
 
 plot
 
+# ggsave(plot,file="privateSchools/pct_private_by_county.jpg")
 ```
 
 
