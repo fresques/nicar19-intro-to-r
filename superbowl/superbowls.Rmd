@@ -1,0 +1,111 @@
+---
+title: "Untitled"
+author: "Sandhya"
+date: "1/27/2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+install.packages("rvest")
+install.packages("stringr")
+install.packages("tidyr")
+
+library(here)
+library(rvest)
+library(stringr)
+library(tidyr)
+
+```
+
+## About the data
+
+Rvest is used for scraping data from the web and includes commands html and html_node
+Stringr is useful for working with strings, including matching, subsetting and extracting data
+Tidyr is a common package used for reshaping data
+
+One row per superbowl 
+
+we want to look at the superbowl data over time 
+
+#First assign the web address to url
+```{r}
+url <- 'http://espn.go.com/nfl/superbowl/history/winners'
+
+```
+Pass it through the command called 'read_html'
+read_html is part of the rvest package and pulls the underlying html from a webpage.
+
+```{r}
+superbowl <- read_html(url)
+  # Now we will use the rvest functions html_nodes and html_table 
+  # We'll extract the HTML table and convert it to a data frame
+  superbowl_table <- html_nodes(superbowl, 'table')
+  sb <- html_table(superbowl_table)[[1]]
+  # Check the data
+  head(sb)
+  #What should we remove from the table?
+  sb <- sb[-(1:2), ]
+  #Check the data
+  head(sb)
+  #Now let's set new column names or variables
+  names(sb) <- c("number", "date", "site", "result")
+  #Check the data
+  head(sb)
+
+```
+
+
+```{r}
+  #We can also clean up the data here.
+  #We'll replace Roman numerals with numeric values
+  sb$number <- 1:51
+  #Check the data
+  head(sb)
+  #We will also convert the date to a standard format
+  sb$date <- as.Date(sb$date, "%B. %d, %Y")
+  #Check the data
+  head(sb)
+  #The data column should be split so we can more easily work with the data and filter it. 
+  #We'll divide it into 3 columns. 
+  sb <- separate(sb, date, c('year', 'month','day'),sep = "-")
+  #Check the data
+  head(sb)
+  #The result column should be split so we can more easily work with the data.
+  #We'll divide it into 4 new columns. Let's start by splitting by the comma delimiter.
+  sb <- separate(sb, result, c('winner', 'loser'), sep=', ', remove=TRUE)
+  #Check the data
+  head(sb)
+```
+
+
+Now we'll split out the scores from the winner and loser columns.
+We'll do this by substring pattern matches, which is based on regex.
+Let's look at the table:
+
+
+```{r}
+scorepattern <- " \\d+$"
+sb$winnerScore <- as.numeric(str_extract(sb$winner, scorepattern))
+sb$loserScore <- as.numeric(str_extract(sb$loser, scorepattern))
+sb$winner <- gsub(scorepattern, "", sb$winner)
+sb$loser <- gsub(scorepattern, "", sb$loser)
+```
+Let's write the result out to a csv. 
+write.csv(sb, 'superbowl.csv', row.names=F)
+View(sb)
+
+Let's check for duplicates.
+
+R has a very useful function for detecting duplicate values
+```{r}
+duplicated(sb)
+```
+If there are duplicates, we can remove the duplicate values.
+
+```{r}
+sb <-unique(sb)
+#Now, let's sort our data. 
+sort(sb$winner)
+```
