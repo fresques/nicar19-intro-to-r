@@ -1,7 +1,7 @@
 ---
-title: "Untitled"
-author: "hannah"
-date: "1/22/2019"
+title: "Orange County Private School Enrollment, 2016-17"
+author: "Hannah Fresques"
+date: "3/7/2019"
 output: html_document
 ---
 
@@ -11,25 +11,60 @@ knitr::opts_chunk$set(echo = TRUE)
 library(dplyr)
 library(here)
 library(readxl)
+library(readr)
+library(stringr)
+library(tidyr)
+library(ggplot2)
+
+# turn off scientific notation
+options(scipen=999)
 ```
 
-## About the data
+THIS IS VERSION HAS WORKED EXAMPLES.
+DURING CLASS, PLEASE USE THE OTHER VERSION.
 
-one row per priate school in CA. One file per school year. downloaded from here: https://www.cde.ca.gov/ds/si/ps/ 
 
-we're interested in how many students are in each grade
+# About the data
+
+Data on school enrollment is available from the California Department of Education. Several files were downloaded and saved in the data subfolder.
+  - Private school enrollment data: https://www.cde.ca.gov/ds/si/ps/ 
+  - Public school enrollment data: https://www.cde.ca.gov/ds/sd/sd/filesenr.asp 
+
+# Background & Questions
+
+I'm interested to know which school districts in Orange County have the most students in private school. Let's find out!
+
+# Read in and explore private school data
+
+This data is in an Excel file. We can use the read_xls function from the readxl package to read in the data.  
 
 ```{r}
-priv <- here("privateSchools/data/privateschools1617.xls") %>% read_xls(skip = 3)
+priv <- here("privateSchools/data/privateschools1617.xls") %>% 
+  read_xls(
+    # The skip argument tells R not to read in the first three rows
+    skip = 3
+    )
 ```
 
-That's so much information! Let's just keep the columns we care about.
+
+Now your turn!
+* 2 minutes *
+Get familiar the priv data frame. Use any functions or techniques you like. (Hint: View(), head(), colnames(), and count() are good places to start!).
+
+What information is there? What structure is the data in?
+
 ```{r}
+head(priv)
 colnames(priv)
+```
 
+
+Wow, that's a lot of columns! Let's just keep the columns we care about.
+
+```{r}
 priv2 <- priv %>% 
   # R will let you have spaces in your column names, but the spaces can be a pain to work with. 
-  # replace any spaces in the column name with an underscore
+  # here we replace any spaces in the column name with an underscore
   rename_all(funs(stringr::str_replace_all(.," ","_"))) %>% 
   # choose just the columns we want to keep
   select(Affidavit_ID,
@@ -46,33 +81,93 @@ priv2 <- priv %>%
 ```
 
 
+Now, let's explore the data structure a little more. Is there an ID column that's unique for each row?
+
 ```{r}
-priv2 %>% nrow() # 3076
-priv2 %>% select(Affidavit_ID) %>% n_distinct() # 3076
-priv2 %>% select(CDS_Code) %>% n_distinct() # 3072
+priv2 %>% nrow() 
+priv2 %>% select(Affidavit_ID) %>% n_distinct() 
+priv2 %>% select(CDS_Code) %>% n_distinct() 
+```
+
+What values does the Religious classificaiton and denomination columns have?
+
+```{r}
+priv2 %>% count(Religious_Classification)
+priv2 %>% count(Religious_Classification,Religious_Denomination)
 ```
 
 
-Let's look at total enrollment
+# Read in and explore public school data
+
+This file is tab separated. We'll use the read_tsv function from the readr package.
 
 ```{r}
-enr <- here("privateSchools/data/enr17.txt") %>% read_tsv(col_types = cols(CDS_CODE = col_character()))
-
-enr %>% count(GENDER)
-enr %>% count(ETHNIC)
-
-options(scipen=999)
-
+pub <- here("privateSchools/data/enr16.txt") %>% 
+  read_tsv(
+    # we can specify how R should read in columns (numeric, character, date, etc.)
+    # here, we specify the CDS_CODE column should be read in as character. 
+    # all other columns that we don't specify have their type auto detected.
+    col_types = cols(CDS_CODE = col_character())
+    )
 ```
 
 
-What overlap is there on schools in priv and enr?
+Your turn! 
+* 8 minutes *
+Explore the pub dataset. You'll want to know the following:
+  - how many rows and columns are there?
+  - what are the column names?
+  - what is the structure of the data? what column or combination of columns uniquely identifies a row?
+  - what values are there for GENDER and ETHNIC? 
 
 ```{r}
-overlap <- inner_join(priv2,enr,by=c("CDS_Code"="CDS_CODE"))
+dim(pub)
+colnames(pub)
+pub %>% nrow()
+pub %>% select(CDS_CODE,GENDER,ETHNIC) %>% n_distinct()
+pub %>% count(GENDER)
+pub %>% count(ETHNIC)
 ```
 
-Looks like none. Good.
+The skim() function is also a nice way to get aquainted with your data.
+
+```{r}
+library(skimr)
+skim(pub)
+```
+
+
+
+The pub data is in a 'longer' structure than the priv data. Let's summarize the pub data so it has one row per school.
+```{r}
+pub2 <- pub %>% 
+  select(-ETHNIC,-GENDER) %>% 
+  group_by(CDS_CODE,COUNTY,DISTRICT,SCHOOL) %>% 
+  # this sums all columns, so you don't have to specify each of them
+  summarise_all(funs(sum)) %>% 
+  # this makes the data easier to work with going forward
+  ungroup()
+
+# check to make sure we have the expected number of rows
+pub %>% nrow()
+pub %>% select(CDS_CODE,ETHNIC,GENDER) %>% n_distinct()
+pub2 %>% nrow()
+pub2 %>% select(CDS_CODE) %>% n_distinct()
+```
+
+
+
+
+# Combine the private and public enrollment data
+
+Are there any schools on both priv and enr? Let's do an inner join on CDS_Code to check.
+
+```{r}
+inner_join(priv2,pub,by=c("CDS_Code"="CDS_CODE")) %>% nrow()
+```
+
+None. Good.
+
 
 Let's combine the data.
 
@@ -103,33 +198,45 @@ priv3 <- priv2 %>%
 
 
 # combine public and private schools
-enr2 <- bind_rows(
-  enr   %>% mutate(type="public"),
+# we are concatinating the data, not joining it.
+schools <- bind_rows(
+  pub2  %>% mutate(type="public"),
   priv3 %>% mutate(type="private")
   )
 
-enr2 %>% count(type)
+schools %>% count(type)
 
 ```
 
 
+# Restructure data
 
-
-Let's make our data 'longer'
+Let's make our data 'longer'. Now we want one row per school per grade.
 
 ```{r}
-library(tidyr)
-library(stringr)
-enr_long <- enr2 %>% 
+schools_long <- schools %>% 
   gather(
     key="grade",
     value="enrollment", 
-    -CDS_CODE,-COUNTY,-DISTRICT,-SCHOOL,-ETHNIC,-GENDER,-type,-AFFIDAVIT_ID,-RELIGIOUS_CLASSIFICATION,-RELIGIOUS_DENOMINATION
+    -CDS_CODE,-COUNTY,-DISTRICT,-SCHOOL,-type,-AFFIDAVIT_ID,-RELIGIOUS_CLASSIFICATION,-RELIGIOUS_DENOMINATION
     ) 
 
-enr_long %>% count(grade)
+```
 
-enr_long <- enr_long %>% 
+
+Your turn!
+* 3 minutes *
+What values does the grade column have? Is there anything you would change about it?
+
+```{r}
+schools_long %>% count(grade)
+```
+
+
+Let's clean up the grade column.
+```{r}
+# First, make some changes to the actual words
+schools_long <- schools_long %>% 
   mutate(
     grade_clean = case_when(
       # manually recode grade descriptions here
@@ -139,94 +246,68 @@ enr_long <- enr_long %>%
     )
   )
 
-enr_long %>% count(grade_clean,grade)
+schools_long %>% count(grade_clean,grade)
 
-
+# Second, let's store it as a factor, not character
 library(forcats)
 orderedGrades <- c("KDGN","1","2","3","4","5","6","7","8","UNGR_ELM","9","10","11","12","UNGR_SEC","ADULT","TOTAL")
-enr_long <- enr_long %>% 
+schools_long <- schools_long %>% 
   mutate(
     grade_clean = as_factor(grade_clean,levels=orderedGrades)
   )
 
-enr_long %>% count(grade_clean,grade)
+schools_long %>% count(grade_clean,grade)
 
 ```
 
 
-# sum up across race and gender
+# Summarize to county level
 
+Your turn!
+* 5 minutes *
+Can you create a new data frame called county that has one row per county and columns describing:
+ - the total number of students enrolled in public and private schools
+ - number of students enrolled in private schools
+ - percent of students enrolled in private schools
+
+(Hint! remember there's already a grade called 'total'.)
 
 ```{r}
-enr_medium <- enr_long %>% 
-  group_by(CDS_CODE,COUNTY,DISTRICT,SCHOOL,type,AFFIDAVIT_ID,RELIGIOUS_CLASSIFICATION,RELIGIOUS_DENOMINATION,grade_clean) %>% 
+county <- schools_long %>% 
+  filter(grade_clean=="TOTAL") %>% 
+  group_by(COUNTY) %>% 
   summarize(
-    enrollment=sum(enrollment,na.rm = TRUE)
-  )
+    tot_enr=sum(enrollment),
+    priv_enr=sum((type=="private")*enrollment),
+    priv_pct=priv_enr/tot_enr
+    )
 ```
 
 
+# Make a plot
 
-# sum up by district
+Your turn!
+* 10 minutes *
 
-```{r}
-enr_dist <- enr_medium %>% 
-  group_by(COUNTY,DISTRICT,type,grade_clean) %>%
-  summarize(
-    enrollment=sum(enrollment,na.rm=TRUE)
-  ) 
-```
-
-
-# let's look at orange county!
+Make a plot that looks like this:
+(/privateSchools/pct_private_by_county.jpg)
 
 ```{r}
-orange <- enr_dist %>% filter(COUNTY=="Orange")
-
-orange %>% ungroup() %>% count(DISTRICT)
-
-orange2 <- orange %>% filter(DISTRICT != "SBE - Magnolia Science Academy Santa Ana" & !is.na(DISTRICT))
-```
-
-
-```{r}
-library(ggplot2)
-orange2 %>% 
-  filter(grade_clean!="TOTAL") %>% 
-  ggplot(aes(x=grade_clean,y=enrollment,fill=type)) +
+plot <- county %>% 
+  filter(is.na(COUNTY)==F) %>% 
+  ggplot(aes(x=reorder(COUNTY,priv_pct),y=priv_pct)) +
     geom_col(position="dodge") +
     theme_minimal() +
-    facet_wrap(~DISTRICT)
+    scale_y_continuous(
+      labels=scales::percent_format(accuracy=1),
+      name="Students in private school"
+      ) +
+    scale_x_discrete(name=NULL) +
+    coord_flip()
+
+plot
+
+# ggsave(plot,file="privateSchools/pct_private_by_county.jpg")
 ```
-
-
-
-
-
-# pull out district ID
-
-per https://www.cde.ca.gov/ds/si/ds/:
-The 14-digit CDS code is the official, unique identification of a school within California. The first two digits identify the county, the next five digits identify the school district, and the last seven digits identify the school. 
-
-```{r}
-
-enr <- enr %>% 
-  mutate(
-    dist_id = str_sub(CDS_CODE,1,7)
-  )
-
-enr %>% select(dist_id) %>% n_distinct()
-enr %>% select(COUNTY,DISTRICT) %>% n_distinct()
-
-enr_dist <- enr %>% 
-  group_by()
-```
-
-
-
-
-
-
-
 
 
