@@ -1,7 +1,7 @@
 ---
 title: "Orange County Private School Enrollment, 2016-17"
 author: "Hannah Fresques"
-date: "3/7/2019"
+date: "March 7, 2019"
 output: html_document
 ---
 
@@ -32,7 +32,7 @@ Data on school enrollment is available from the California Department of Educati
 
 # Background & Questions
 
-I'm interested to know which school districts in Orange County have the most students in private school. Let's find out!
+I'm interested to know which counties in California have the most students in private school. Let's find out!
 
 # Read in and explore private school data
 
@@ -72,8 +72,7 @@ priv2 <- priv %>%
     CDS_Code,
     School,
     Public_District,
-    # the colon lets us choose all columns between Low Grade and Total Enrollment without having to list them all.
-    Kindergarten_Enrollment:Total_Enrollment,
+    Total_Enrollment,
     Religious_Classification,
     Religious_Denomination
   ) 
@@ -89,7 +88,7 @@ priv2 %>% select(Affidavit_ID) %>% n_distinct()
 priv2 %>% select(CDS_Code) %>% n_distinct() 
 ```
 
-What values does the Religious classificaiton and denomination columns have?
+What values are in the Religious classificaiton and denomination columns?
 
 ```{r}
 priv2 %>% count(Religious_Classification)
@@ -137,150 +136,83 @@ skim(pub)
 ```
 
 
+# Summarize each to county level
 
-The pub data is in a 'longer' structure than the priv data. Let's summarize the pub data so it has one row per school.
+We only care about enrollment at the county level. Let's summarize our data so we have information about public and private school enrollment in each county.
+
+First, we'll summarize the private school data.
 ```{r}
-pub2 <- pub %>% 
-  select(-ETHNIC,-GENDER) %>% 
-  group_by(CDS_CODE,COUNTY,DISTRICT,SCHOOL) %>% 
-  # this sums all columns, so you don't have to specify each of them
-  summarise_all(funs(sum)) %>% 
-  # this makes the data easier to work with going forward
-  ungroup()
-
-# check to make sure we have the expected number of rows
-pub %>% nrow()
-pub %>% select(CDS_CODE,ETHNIC,GENDER) %>% n_distinct()
-pub2 %>% nrow()
-pub2 %>% select(CDS_CODE) %>% n_distinct()
+county_priv <- priv2 %>% 
+  group_by(County) %>% 
+  summarize(
+    n_schools_priv = n_distinct(Affidavit_ID),
+    enrollment_priv = sum(Total_Enrollment)
+  )
 ```
 
+Next, we'll summarize the public school data. Remember, the pub data is in a 'longer' structure than the priv data. But we can add up our data just the same as we did with the private school data frame.
 
+You try!
+* 5 minutes *
+```{r}
+county_pub <- pub %>% 
+  group_by(COUNTY) %>% 
+  summarize(
+    n_schools_pub = n_distinct(CDS_CODE),
+    enrollment_pub = sum(ENR_TOTAL)
+  )
+```
+
+How many rows are on county_pub? county_priv? 
 
 
 # Combine the private and public enrollment data
 
-Are there any schools on both priv and enr? Let's do an inner join on CDS_Code to check.
+Are there any counties that AREN'T on both priv and enr? Let's do an anit join to check.
 
 ```{r}
-inner_join(priv2,pub,by=c("CDS_Code"="CDS_CODE")) %>% nrow()
+# this will return any counties on county_priv that aren't on county_pub
+anti_join(county_priv,county_pub,by=c("County"="COUNTY")) 
+
+# this will return any counties on county_pub that aren't on county_priv
+anti_join(county_pub,county_priv,by=c("COUNTY"="County")) 
 ```
 
-None. Good.
+Yes, a few. 
 
-
-Let's combine the data.
-
+Now let's join the data.
 
 ```{r}
-# make column names consistent
-priv3 <- priv2 %>%
-  rename(
-    DISTRICT=Public_District,
-    KDGN=Kindergarten_Enrollment,
-    GR_1=Grade_1_Enrollment,
-    GR_2=Grade_2_Enrollment,
-    GR_3=Grade_3_Enrollment,
-    GR_4=Grade_4_Enrollment,
-    GR_5=Grade_5_Enrollment,
-    GR_6=Grade_6_Enrollment,
-    GR_7=Grade_7_Enrollment,
-    GR_8=Grade_8_Enrollment,
-    UNGR_ELM=Ungraded_Elementary_Enrollmnet,
-    GR_9=Grade_9_Enrollment,
-    GR_10=Grade_10_Enrollment,
-    GR_11=Grade_11_Enrollment,
-    GR_12=Grade_12_Enrollment,
-    UNGR_SEC=Ungraded_Secondary_Enrollment,
-    ENR_TOTAL=Total_Enrollment
-  ) %>% 
-  rename_all(funs(toupper(.))) 
+county <- full_join(
+  county_pub,
+  county_priv,
+  by=c("COUNTY"="County")
+)
 
+```
 
-# combine public and private schools
-# we are concatinating the data, not joining it.
-schools <- bind_rows(
-  pub2  %>% mutate(type="public"),
-  priv3 %>% mutate(type="private")
-  )
+Let's take a look at the dataset.
+I think we should drop the NA county. 
+```{r}
+county2 <- county %>% 
+  filter(is.na(COUNTY)==F)
+```
 
-schools %>% count(type)
+What about those NAs for Alpine and Sierra counties? I think they should be zeros instead.
+
+```{r}
+county2 <- county2 %>% 
+  replace_na(list(n_schools_priv = 0, enrollment_priv = 0))
 
 ```
 
 
-# Restructure data
-
-Let's make our data 'longer'. Now we want one row per school per grade.
+What percent of students in each county attend a private school?
 
 ```{r}
-schools_long <- schools %>% 
-  gather(
-    key="grade",
-    value="enrollment", 
-    -CDS_CODE,-COUNTY,-DISTRICT,-SCHOOL,-type,-AFFIDAVIT_ID,-RELIGIOUS_CLASSIFICATION,-RELIGIOUS_DENOMINATION
-    ) 
-
-```
-
-
-Your turn!
-* 3 minutes *
-What values does the grade column have? Is there anything you would change about it?
-
-```{r}
-schools_long %>% count(grade)
-```
-
-
-Let's clean up the grade column.
-```{r}
-# First, make some changes to the actual words
-schools_long <- schools_long %>% 
-  mutate(
-    grade_clean = case_when(
-      # manually recode grade descriptions here
-      grade=="ENR_TOTAL"~"TOTAL",
-      # then clean up the rest with this formula to remove GR_ 
-      TRUE~str_replace(grade,"^GR_","")
-    )
-  )
-
-schools_long %>% count(grade_clean,grade)
-
-# Second, let's store it as a factor, not character
-library(forcats)
-orderedGrades <- c("KDGN","1","2","3","4","5","6","7","8","UNGR_ELM","9","10","11","12","UNGR_SEC","ADULT","TOTAL")
-schools_long <- schools_long %>% 
-  mutate(
-    grade_clean = as_factor(grade_clean,levels=orderedGrades)
-  )
-
-schools_long %>% count(grade_clean,grade)
-
-```
-
-
-# Summarize to county level
-
-Your turn!
-* 5 minutes *
-Can you create a new data frame called county that has one row per county and columns describing:
- - the total number of students enrolled in public and private schools
- - number of students enrolled in private schools
- - percent of students enrolled in private schools
-
-(Hint! remember there's already a grade called 'total'.)
-
-```{r}
-county <- schools_long %>% 
-  filter(grade_clean=="TOTAL") %>% 
-  group_by(COUNTY) %>% 
-  summarize(
-    tot_enr=sum(enrollment),
-    priv_enr=sum((type=="private")*enrollment),
-    priv_pct=priv_enr/tot_enr
-    )
+county2 <- county2 %>% 
+  mutate(enrollment_total = enrollment_priv + enrollment_pub) %>% 
+  mutate(pct_priv = enrollment_priv / enrollment_total)
 ```
 
 
@@ -290,12 +222,11 @@ Your turn!
 * 10 minutes *
 
 Make a plot that looks like this:
-(/privateSchools/pct_private_by_county.jpg)
+![final plot](pct_private_by_county.jpg)
 
 ```{r}
-plot <- county %>% 
-  filter(is.na(COUNTY)==F) %>% 
-  ggplot(aes(x=reorder(COUNTY,priv_pct),y=priv_pct)) +
+plot <- county2 %>% 
+  ggplot(aes(x=reorder(COUNTY,pct_priv),y=pct_priv)) +
     geom_col(position="dodge") +
     theme_minimal() +
     scale_y_continuous(
