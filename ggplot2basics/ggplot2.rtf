@@ -1,0 +1,240 @@
+{\rtf1\ansi\ansicpg1252\cocoartf1404\cocoasubrtf470
+{\fonttbl\f0\fswiss\fcharset0 Helvetica;}
+{\colortbl;\red255\green255\blue255;}
+\paperw11900\paperh16840\margl1440\margr1440\vieww10800\viewh8400\viewkind0
+\pard\tx720\tx1440\tx2160\tx2880\tx3600\tx4320\tx5040\tx5760\tx6480\tx7200\tx7920\tx8640\pardirnatural\partightenfactor0
+
+\f0\fs24 \cf0 The Grammar of Graphics: Designing and Transforming Data\
+========================================================\
+author: Sandhya Kambhampati \
+date: Jan 2019\
+\
+What is R?\
+========================================================\
+"R is a language and environment for statistical computing and graphics" \
+\
+Source: R-project.org \
+\
+What is ggplot2?\
+========================================================\
+* *ggplot2* is a data visualization package for R\
+  + developed by Hadley Wickham\
+  + inspired by Leland Wilkinson's "The Grammar of Graphics"\
+  + provides an organizing philosophy for building graphs -- a structured approach to graphing\
+\
+> "The emphasis in *ggplot2* is reducing the amount of thinking time by making it easier to go from the plot in your brain to the plot on the page."\
+\
+> Wickham, 2012\
+\
+The philosophy of ggplot2\
+========================================================\
+* A *ggplot2* graph is built up from a few basic elements:\
+  + **Data**: the raw data you want to plot\
+  + **Aesthetics**: including **Mapping** e.g., which variable is on the x-axis? the y-axis? Should the color/size/position of the plotted data that be mapped to some variable? (basically something you can see)\
+  + **Geometries**: the geometric shapes that represent the data\
+  + **Statistics**: statistical transformations that are used to summarize the data\
+\
+Source: [Hopper (2014)] (http://tomhopper.me/2014/03/28/a-simple-introduction-to-the-graphing-philosophy-of-ggplot2/)\
+\
+Things to know\
+========================================================\
+- Columns of data are mapped to aesthetics\
+- Legend maps the visual element and the data values\
+- Can't create interactive graphics (see the ggvis package for this)\
+\
+Things to know\
+========================================================\
+- Non-data related aspects controlled by theme\
+  - background\
+  - size of title\
+  - font of the tick labels\
+  - legend location \
+  \
+Structure of the code\
+========================================================\
+ggplot(data = <data set>, \
+       aes(x = <x axis variable>,\
+           y = <y axis variable>,\
+           <other aesthetic mappings>),\
+       <other plot defaults>) \
+\
+How to install ggplot2\
+========================================================\
+#install the package\
+install.packages("ggplot2")\
+\
+#load the package into your current project\
+library(ggplot2)\
+\
+Make sure you have the most recent version of R to get the most recent version of *ggplot2*\
+\
+The Data: Road Casualties in Great Britain 1969\'9684\
+========================================================\
+data(Seatbelts)\
+s <- as.data.frame(Seatbelts)\
+\
+Add in the time series data \
+========================================================\
+\
+ts <- data.frame(Year=floor(time(Seatbelts)),\
+Month=factor(cycle(Seatbelts),\
+labels=month.abb), Seatbelts)\
+\
+The Data: Road Casualties in Great Britain 1969\'9684\
+========================================================\
+* **DriversKilled**: car drivers killed\
+* **drivers**: monthly totals of car drivers in Great Britain killed or seriously injured Jan 1969 to Dec 1984\
+* **front**: front-seat passengers killed or seriously injured\
+* **rear**: rear-seat passengers killed or seriously injured\
+* **kms**: distance driven\
+* **PetrolPrice**: price of petrol\
+* **VanKilled**: number of van (\'91light goods vehicle\'92) drivers\
+* **law**: 0/1: was the law in effect that month?\
+\
+\
+Source: UK Driver Deaths via [R datasets](https://stat.ethz.ch/R-manual/R-devel/library/datasets/html/UKDriverDeaths.html)\
+\
+Look at your data\
+========================================================\
+head(ts)\
+\
+How to plot your data: quick plot\
+========================================================\
+qplot( data = ts,x= Year,y= DriversKilled, main= "Drivers Killed by Year")\
+\
+Basic Features of ggplot2\
+========================================================\
+* Scatter Plot (geom_point)\
+* Bar Graph (geom_bar)\
+* Line Graph (geom_line)\
+\
+Scatter Plot\
+========================================================\
+ggplot(data = ts, \
+       aes(x = Year, \
+           y = DriversKilled)) + \
+  geom_point() +\
+  ggtitle("Drivers killed by Year")\
+\
+\
+Bar Graph - simple\
+========================================================\
+ggplot(data = ts, \
+       aes(x = Year, \
+           y = VanKilled)) +\
+  geom_bar(stat = 'identity')\
+\
+Line Graph\
+========================================================\
+ggplot(data = ts, \
+       aes(x = Year, \
+           y = front)) +\
+  geom_point() +\
+  geom_line()\
+\
+Now, let's make the charts a little more easy to read \
+========================================================\
+\
+Scatter Plot - relabel y-axis\
+========================================================\
+ggplot(data = ts, \
+       aes(x = Year, \
+           y = DriversKilled)) + \
+  geom_point() +\
+  scale_y_continuous(limits = c(50,200))\
+\
+Scatter Plot - color mapped to month\
+========================================================\
+ggplot(data = ts, \
+       aes(x = Year, \
+           y = DriversKilled, \
+           color = Month)) + \
+  geom_point() \
+\
+Bar Graph - simple, transparent background\
+========================================================\
+ggplot(data = ts, \
+       aes(x = Year, \
+           y = VanKilled)) +\
+  geom_bar(stat = 'identity') +\
+  theme(panel.background = element_blank())\
+\
+The philosophy of ggplot2 - recap\
+========================================================\
+* A *ggplot2* graph is built up from a few basic elements:\
+  + **Data**: the raw data you want to plot\
+  + **Aesthetics**: including **Mapping** e.g., which variable is on the x-axis? the y-axis? Should the color/size/position of the plotted data that be mapped to some variable?\
+  + **Geometries**: the geometric shapes that represent the data\
+  + **Statistics**: statistical transformations that are used to summarize the data\
+\
+Source: [Hopper (2014)] (http://tomhopper.me/2014/03/28/a-simple-introduction-to-the-graphing-philosophy-of-ggplot2/)\
+\
+Advanced Features\
+========================================================\
+* Text Labels\
+* Facetting\
+* Fitted Lines\
+\
+Text Labels \
+========================================================\
+ggplot(data = ts, \
+       aes(x = Month, \
+           y = DriversKilled)) +\
+        geom_text(aes(label = Year), size = 2) \
+        \
+Facetting\
+========================================================\
+\
+* Facetting allows you to split up your data by one or two variables\
+* *facet_grid()* places one or two variables in either vertical or horizontal directions\
+* *facet_wrap()* places facets next to each other, wrapping with a certain # of rows and/or columns\
+\
+Examples: \
+facet_grid(vertical ~ horizontal)\
+\
+facet_wrap(~ variable, nrow = ___, ncol = ___)\
+\
+\
+Advanced Line Graph\
+========================================================\
+ggplot(data = ts, \
+       aes(x = Year, \
+           y = DriversKilled)) + \
+  geom_line() +\
+  facet_wrap(~ Month)\
+\
+Fitted Lines\
+========================================================\
+* How do we draw a fitted line through these points? \
+\
+Fitted Lines\
+========================================================\
+ggplot(data = ts, \
+       aes(x = Year, \
+           y = DriversKilled)) + \
+  geom_point() +\
+  stat_smooth(method = 'lm')\
+  \
+Now, let's combine those advanced features\
+========================================================\
+ggplot(data = ts, \
+       aes(x = Year, \
+           y = DriversKilled)) + \
+  geom_line() +\
+  facet_wrap(~ Month) + \
+  stat_smooth(method = 'lm')\
+  \
+Resources\
+======================================================\
+* ["A Layered Grammar of Graphics"](http://vita.had.co.nz/papers/layered-grammar.html) by Hadley Wickham\
+\
+* ["A Simple Introduction to the Graphing Philosophy of ggplot2"](http://tomhopper.me/2014/03/28/a-simple-introduction-to-the-graphing-philosophy-of-ggplot2/) by Tom Hopper\
+\
+* [ggplot2 Cheat Sheet](https://www.rstudio.com/wp-content/uploads/2015/03/ggplot2-cheatsheet.pdf) by RStudio\
+\
+* [ggplot2 Documentation](http://docs.ggplot2.org/current/) by Hadley Wickham & Winston Chang\
+\
+* [Shapes and Line Types in R](http://www.cookbook-r.com/Graphs/Shapes_and_line_types/) by Winston Chang\
+\
+Sandhya Kambhampati    \
+[@sandhya__k](https://twitter.com/sandhya__k)}
