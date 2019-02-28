@@ -1,6 +1,6 @@
 ########################################
 ##   Basic Data Visualization in R    ##
-##    Sandhya Kambhampati  			  ##
+##    Sandhya Kambhampati  			      ##
 ##     @sandhya__k                    ##
 ########################################
 
@@ -32,6 +32,8 @@
 #############################
 ## 2. Plotting your data  ##
 ############################
+
+library(graphics)
 
 #1. Bar and column charts: 'barplot'
 

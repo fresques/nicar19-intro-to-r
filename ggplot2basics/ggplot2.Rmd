@@ -1,18 +1,17 @@
 The Grammar of Graphics: Designing and Transforming Data
 ========================================================
 author: Sandhya Kambhampati 
-date: Jan 27, 2019
+date: March 2019
 font-family: 'Helvetica'
 
 What is R?
 ========================================================
-<br>
 "R is a language and environment for statistical computing and graphics" 
 
 Source: R-project.org 
-
 What is ggplot2?
 ========================================================
+<br>
 * *ggplot2* is a data visualization package for R
   + developed by Hadley Wickham
   + inspired by Leland Wilkinson's "The Grammar of Graphics"
@@ -109,9 +108,6 @@ head(ts)
 
 How to plot your data: quick plot
 ========================================================
-
-
-
 
 ```r
 qplot( data = ts,x= Year,y= DriversKilled, main= "Drivers Killed by Year")
