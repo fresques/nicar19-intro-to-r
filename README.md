@@ -29,4 +29,4 @@ To use the tools we used in class, you need to install both [R](https://cran.rst
 
 [Weekly R exercises](https://github.com/rfordatascience/tidytuesday/blob/master/README.md)
 
-[Intro to R online course by Andrew Ba Tran] (http://learn.r-journalism.com/en/introduction/)
+[Intro to R online course by Andrew Ba Tran].(http://learn.r-journalism.com/en/introduction/)
